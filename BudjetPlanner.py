@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Budget Planner CLI
-Save as: budget_planner.py
-Run: python budget_planner.py
 """
 
 import sqlite3

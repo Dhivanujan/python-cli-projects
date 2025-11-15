@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Mini Banking System - CLI
-Save as: mini_bank.py
-Run: python mini_bank.py
 """
 
 import sqlite3
