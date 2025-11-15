@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 CLI Notes App
-Save as: notes_app.py
-Run: python notes_app.py
 """
 
 import sqlite3
