@@ -1,0 +1,26 @@
+[
+  {
+    "question": "What is the capital of France?",
+    "choices": ["Berlin", "London", "Paris", "Madrid"],
+    "answer": "Paris"
+  },
+  {
+    "question": "Which language is this program written in?",
+    "choices": ["Java", "Python", "JavaScript", "Go"],
+    "answer": "Python"
+  },
+  {
+    "question": "What does 'CPU' stand for?",
+    "answer": "central processing unit"
+  },
+  {
+    "question": "Which built-in Python function returns the length of an object?",
+    "choices": ["size()", "len()", "length()", "count()"],
+    "answer": "len()"
+  },
+  {
+    "question": "What year did Python 3.0 release?",
+    "choices": ["2008", "2010", "2000", "2015"],
+    "answer": "2008"
+  }
+]
