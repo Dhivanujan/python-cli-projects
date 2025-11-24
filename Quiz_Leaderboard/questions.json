@@ -1,26 +1,7 @@
 [
-  {
-    "question": "What is the capital of France?",
-    "choices": ["Berlin", "London", "Paris", "Madrid"],
-    "answer": "Paris"
-  },
-  {
-    "question": "Which language is this program written in?",
-    "choices": ["Java", "Python", "JavaScript", "Go"],
-    "answer": "Python"
-  },
-  {
-    "question": "What does CPU stand for?",
-    "answer": "central processing unit"
-  },
-  {
-    "question": "Which Python function returns the length of an object?",
-    "choices": ["size()", "len()", "length()", "count()"],
-    "answer": "len()"
-  },
-  {
-    "question": "Year Python 3.0 was released?",
-    "choices": ["2008", "2010", "2000", "2015"],
-    "answer": "2008"
-  }
+  {"question":"Capital of France?","choices":["Berlin","London","Paris","Madrid"],"answer":"Paris"},
+  {"question":"Language this program is written in?","choices":["Java","Python","JS","Go"],"answer":"Python"},
+  {"question":"What does CPU stand for?","answer":"central processing unit"},
+  {"question":"Python function returning length?","choices":["len()","size()","length()","count()"],"answer":"len()"},
+  {"question":"Year Python 3.0 released?","choices":["2008","2010","2000","2015"],"answer":"2008"}
 ]
