@@ -1,106 +1,35 @@
 #!/usr/bin/env python3
 """
-Quiz + Leaderboard CLI App
-Features:
-- Multi-user support
-- Timed questions
-- Randomized questions
-- Score tracking
-- Leaderboard saved in JSON
+GUI Quiz + Leaderboard System
+- Tkinter GUI for quiz
+- Timed questions with countdown
+- Random questions
+- Leaderboard display with Matplotlib
 """
 
+import tkinter as tk
+from tkinter import messagebox, simpledialog
 import json
 import random
-import threading
 import time
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 
 QUESTIONS_FILE = Path("questions.json")
 LEADERBOARD_FILE = Path("leaderboard.json")
 
 
-# ---------------------- Input with Timeout ----------------------
-def input_with_timeout(prompt, timeout):
-    """Prompt user input with timeout using a background thread."""
-    result = {"value": None}
-
-    def target():
-        try:
-            result["value"] = input(prompt)
-        except Exception:
-            result["value"] = None
-
-    thread = threading.Thread(target=target)
-    thread.daemon = True
-    thread.start()
-    thread.join(timeout)
-    if thread.is_alive():
-        return None
-    return result["value"]
+# ---------------------- Data ----------------------
+def load_questions():
+    if not QUESTIONS_FILE.exists():
+        raise FileNotFoundError(f"{QUESTIONS_FILE} not found")
+    with open(QUESTIONS_FILE, "r") as f:
+        data = json.load(f)
+    return data
 
 
-# ---------------------- Quiz Classes ----------------------
-class Question:
-    def __init__(self, question_text, answer, choices=None):
-        self.text = question_text
-        self.choices = choices
-        self.answer = answer
-
-    def ask(self, timeout):
-        print(f"\n{self.text}")
-        if self.choices:
-            for idx, choice in enumerate(self.choices, start=1):
-                print(f"  {idx}. {choice}")
-        start = time.time()
-        user_input = input_with_timeout("> Your answer: ", timeout)
-        elapsed = time.time() - start
-        if user_input is None:
-            print(f"⏰ Time's up!")
-            return False, elapsed
-        else:
-            user_input = user_input.strip()
-            correct = False
-            if self.choices:
-                # numeric index or text
-                try:
-                    idx = int(user_input)
-                    chosen = self.choices[idx - 1] if 1 <= idx <= len(self.choices) else None
-                except:
-                    chosen = user_input
-                correct = str(chosen).strip().lower() == str(self.answer).strip().lower()
-            else:
-                correct = user_input.strip().lower() == str(self.answer).strip().lower()
-            if correct:
-                print("✅ Correct!")
-            else:
-                print(f"❌ Incorrect. Correct answer: {self.answer}")
-            return correct, elapsed
-
-
-class Quiz:
-    def __init__(self, questions, per_question_time=15, num_questions=None):
-        self.questions = questions[:]
-        self.per_question_time = per_question_time
-        self.num_questions = num_questions if num_questions else len(self.questions)
-
-    def start(self):
-        asked = random.sample(self.questions, self.num_questions)
-        score = 0
-        details = []
-        for q in asked:
-            correct, elapsed = q.ask(self.per_question_time)
-            details.append({
-                "question": q.text,
-                "correct": correct,
-                "time": round(elapsed, 2)
-            })
-            if correct:
-                score += 1
-        return score, details
-
-
-# ---------------------- Leaderboard ----------------------
 def load_leaderboard():
     if LEADERBOARD_FILE.exists():
         with open(LEADERBOARD_FILE, "r") as f:
@@ -108,84 +37,170 @@ def load_leaderboard():
     return []
 
 
-def save_leaderboard(leaderboard):
+def save_leaderboard(lb):
     with open(LEADERBOARD_FILE, "w") as f:
-        json.dump(leaderboard, f, indent=2)
+        json.dump(lb, f, indent=2)
 
 
-def update_leaderboard(username, score, total):
-    leaderboard = load_leaderboard()
-    leaderboard.append({
-        "user": username,
-        "score": score,
-        "total": total,
-        "timestamp": datetime.utcnow().isoformat() + "Z"
-    })
-    # Sort by score descending
-    leaderboard.sort(key=lambda x: x["score"], reverse=True)
-    save_leaderboard(leaderboard)
+# ---------------------- GUI App ----------------------
+class QuizApp:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Quiz + Leaderboard")
+        self.username = ""
+        self.questions = load_questions()
+        self.leaderboard = load_leaderboard()
+        self.num_questions = len(self.questions)
+        self.per_question_time = 15
 
+        self.current_index = 0
+        self.score = 0
+        self.current_question = None
+        self.remaining_time = self.per_question_time
+        self.timer_id = None
 
-def show_leaderboard(limit=10):
-    leaderboard = load_leaderboard()
-    print("\n=== Leaderboard ===")
-    for i, entry in enumerate(leaderboard[:limit], start=1):
-        user = entry["user"]
-        score = entry["score"]
-        total = entry["total"]
-        ts = entry["timestamp"]
-        print(f"{i}. {user}: {score}/{total} ({ts})")
-    print("==================\n")
+        self.quiz_questions = []
 
+        self.build_login_screen()
 
-# ---------------------- CLI ----------------------
-def load_questions():
-    if not QUESTIONS_FILE.exists():
-        raise FileNotFoundError(f"{QUESTIONS_FILE} not found!")
-    with open(QUESTIONS_FILE, "r") as f:
-        data = json.load(f)
-    questions = []
-    for q in data:
-        questions.append(Question(q["question"], q["answer"], q.get("choices")))
-    return questions
+    # ---------------- Login ----------------
+    def build_login_screen(self):
+        for widget in self.master.winfo_children():
+            widget.destroy()
+        self.login_label = tk.Label(self.master, text="Enter your username:")
+        self.login_label.pack(pady=10)
+        self.username_entry = tk.Entry(self.master)
+        self.username_entry.pack(pady=5)
+        self.login_button = tk.Button(self.master, text="Start Quiz", command=self.start_quiz)
+        self.login_button.pack(pady=10)
 
+    # ---------------- Quiz ----------------
+    def start_quiz(self):
+        self.username = self.username_entry.get().strip()
+        if not self.username:
+            self.username = "Guest"
+        # Ask number of questions
+        n = simpledialog.askinteger("Questions", f"Number of questions (max {len(self.questions)}):", minvalue=1, maxvalue=len(self.questions))
+        self.num_questions = n if n else len(self.questions)
+        t = simpledialog.askinteger("Timer", "Seconds per question:", initialvalue=15, minvalue=5, maxvalue=60)
+        self.per_question_time = t if t else 15
+        # Random questions
+        self.quiz_questions = random.sample(self.questions, self.num_questions)
+        self.current_index = 0
+        self.score = 0
+        self.show_question()
 
-def main():
-    print("=== Welcome to Quiz + Leaderboard System ===")
-    username = input("Enter your username: ").strip() or "Guest"
+    def show_question(self):
+        for widget in self.master.winfo_children():
+            widget.destroy()
+        self.current_question = self.quiz_questions[self.current_index]
+        self.remaining_time = self.per_question_time
 
-    questions = load_questions()
-    while True:
-        print("\nMenu:")
-        print("1) Take Quiz")
-        print("2) View Leaderboard")
-        print("3) Exit")
-        choice = input("Choose: ").strip()
-        if choice == "1":
-            num_q = input(f"Number of questions (max {len(questions)}): ").strip()
-            try:
-                num_q = int(num_q)
-                if num_q < 1 or num_q > len(questions):
-                    num_q = len(questions)
-            except:
-                num_q = len(questions)
-            per_question_time = input("Seconds per question (default 15): ").strip()
-            try:
-                per_question_time = int(per_question_time)
-            except:
-                per_question_time = 15
-            quiz = Quiz(questions, per_question_time, num_q)
-            score, details = quiz.start()
-            print(f"\nQuiz Complete! Score: {score}/{num_q}")
-            update_leaderboard(username, score, num_q)
-        elif choice == "2":
-            show_leaderboard()
-        elif choice == "3":
-            print("Goodbye!")
-            break
+        # Question text
+        self.q_label = tk.Label(self.master, text=f"Q{self.current_index+1}: {self.current_question['question']}", wraplength=400)
+        self.q_label.pack(pady=10)
+
+        self.answer_var = tk.StringVar()
+
+        # Multiple-choice
+        if 'choices' in self.current_question:
+            self.choice_buttons = []
+            for choice in self.current_question['choices']:
+                rb = tk.Radiobutton(self.master, text=choice, variable=self.answer_var, value=choice)
+                rb.pack(anchor='w')
+                self.choice_buttons.append(rb)
         else:
-            print("Invalid choice.")
+            # Open-ended
+            self.answer_entry = tk.Entry(self.master, textvariable=self.answer_var)
+            self.answer_entry.pack(pady=5)
+
+        # Timer label
+        self.timer_label = tk.Label(self.master, text=f"Time left: {self.remaining_time}s")
+        self.timer_label.pack(pady=5)
+
+        # Submit button
+        self.submit_button = tk.Button(self.master, text="Submit", command=self.submit_answer)
+        self.submit_button.pack(pady=10)
+
+        # Start countdown
+        self.countdown()
+
+    def countdown(self):
+        self.timer_label.config(text=f"Time left: {self.remaining_time}s")
+        if self.remaining_time <= 0:
+            self.submit_answer(timeout=True)
+            return
+        self.remaining_time -= 1
+        self.timer_id = self.master.after(1000, self.countdown)
+
+    def submit_answer(self, timeout=False):
+        if self.timer_id:
+            self.master.after_cancel(self.timer_id)
+
+        user_answer = self.answer_var.get().strip() if not timeout else ""
+        correct_answer = self.current_question['answer']
+
+        if timeout:
+            messagebox.showinfo("Time's up!", f"Correct answer: {correct_answer}")
+        else:
+            if user_answer.lower() == str(correct_answer).lower():
+                messagebox.showinfo("Correct!", "Your answer is correct!")
+                self.score += 1
+            else:
+                messagebox.showinfo("Incorrect", f"Correct answer: {correct_answer}")
+
+        self.current_index += 1
+        if self.current_index < self.num_questions:
+            self.show_question()
+        else:
+            self.finish_quiz()
+
+    # ---------------- Finish Quiz ----------------
+    def finish_quiz(self):
+        # Save to leaderboard
+        self.leaderboard.append({
+            "user": self.username,
+            "score": self.score,
+            "total": self.num_questions,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+        # Sort descending
+        self.leaderboard.sort(key=lambda x: x['score'], reverse=True)
+        save_leaderboard(self.leaderboard)
+
+        for widget in self.master.winfo_children():
+            widget.destroy()
+        tk.Label(self.master, text=f"Quiz Complete! Score: {self.score}/{self.num_questions}").pack(pady=10)
+        tk.Button(self.master, text="View Leaderboard", command=self.show_leaderboard).pack(pady=5)
+        tk.Button(self.master, text="Exit", command=self.master.quit).pack(pady=5)
+
+    # ---------------- Leaderboard ----------------
+    def show_leaderboard(self):
+        for widget in self.master.winfo_children():
+            widget.destroy()
+        tk.Label(self.master, text="Leaderboard (Top 10)").pack(pady=5)
+        top10 = self.leaderboard[:10]
+        for idx, entry in enumerate(top10, start=1):
+            tk.Label(self.master, text=f"{idx}. {entry['user']}: {entry['score']}/{entry['total']}").pack(anchor='w')
+
+        # Plot leaderboard chart
+        users = [e['user'] for e in top10]
+        scores = [e['score'] for e in top10]
+        fig, ax = plt.subplots(figsize=(5,3))
+        ax.barh(users[::-1], scores[::-1], color='skyblue')
+        ax.set_xlabel("Score")
+        ax.set_title("Top 10 Scores")
+        plt.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=self.master)
+        canvas.draw()
+        canvas.get_tk_widget().pack(pady=10)
+
+        tk.Button(self.master, text="Back to Login", command=self.build_login_screen).pack(pady=5)
 
 
+# ---------------------- Run ----------------------
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = QuizApp(root)
+    root.mainloop()
